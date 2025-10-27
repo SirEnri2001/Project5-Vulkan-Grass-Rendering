@@ -16,6 +16,7 @@ public:
     VkDevice GetVkDevice();
     VkQueue GetQueue(QueueFlags flag);
     unsigned int GetQueueIndex(QueueFlags flag);
+	unsigned int GetSwapchainImageCount();
     ~Device();
 
 private:
@@ -27,4 +28,5 @@ private:
     Instance* instance;
     VkDevice vkDevice;
     Queues queues;
+	SwapChain* swapChain;
 };

@@ -22,9 +22,14 @@ unsigned int Device::GetQueueIndex(QueueFlags flag) {
 }
 
 SwapChain* Device::CreateSwapChain(VkSurfaceKHR surface, unsigned int numBuffers) {
-    return new SwapChain(this, surface, numBuffers);
+    swapChain = new SwapChain(this, surface, numBuffers);
+	return swapChain;
 }
 
 Device::~Device() {
     vkDestroyDevice(vkDevice, nullptr);
+}
+
+unsigned int Device::GetSwapchainImageCount() {
+	return swapChain->GetCount();
 }

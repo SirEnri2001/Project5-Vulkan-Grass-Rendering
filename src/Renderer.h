@@ -4,7 +4,7 @@
 #include "SwapChain.h"
 #include "Scene.h"
 #include "Camera.h"
-
+struct ImDrawData;
 class Renderer {
 public:
     Renderer() = delete;
@@ -39,7 +39,13 @@ public:
     void RecordCommandBuffers();
     void RecordComputeCommandBuffer();
 
+	void CreateImguiResources();
+    void RecordImguiCommandBuffer();
+
+    void RenderImGUI(ImDrawData* draw_data);
+
     void Frame();
+    VkRenderPass renderPass;
 
 private:
     Device* device;
@@ -49,9 +55,10 @@ private:
     Camera* camera;
 
     VkCommandPool graphicsCommandPool;
+    VkCommandPool imguiCommandPool;
     VkCommandPool computeCommandPool;
 
-    VkRenderPass renderPass;
+    VkFence Fence;
 
     VkDescriptorSetLayout cameraDescriptorSetLayout;
     VkDescriptorSetLayout modelDescriptorSetLayout;
@@ -83,5 +90,7 @@ private:
     std::vector<VkFramebuffer> framebuffers;
 
     std::vector<VkCommandBuffer> commandBuffers;
+    VkCommandBuffer graphicsCommandBuffer;
     VkCommandBuffer computeCommandBuffer;
+    VkCommandBuffer imguiCommandBuffer;
 };

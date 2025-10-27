@@ -5,6 +5,11 @@
 #include "Blades.h"
 #include "Camera.h"
 #include "Image.h"
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
+
+#include <iostream>
 
 static constexpr unsigned int WORKGROUP_SIZE = 32;
 
@@ -31,6 +36,7 @@ Renderer::Renderer(Device* device, SwapChain* swapChain, Scene* scene, Camera* c
     CreateGraphicsPipeline();
     CreateGrassPipeline();
     CreateComputePipeline();
+    CreateImguiResources();
     RecordCommandBuffers();
     RecordComputeCommandBuffer();
 }
@@ -42,6 +48,15 @@ void Renderer::CreateCommandPools() {
     graphicsPoolInfo.flags = 0;
 
     if (vkCreateCommandPool(logicalDevice, &graphicsPoolInfo, nullptr, &graphicsCommandPool) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create command pool");
+    }
+
+    VkCommandPoolCreateInfo imguiPoolInfo = {};
+    imguiPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    imguiPoolInfo.queueFamilyIndex = device->GetInstance()->GetQueueFamilyIndices()[QueueFlags::Graphics];
+    imguiPoolInfo.flags = 0;
+
+    if (vkCreateCommandPool(logicalDevice, &imguiPoolInfo, nullptr, &imguiCommandPool) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create command pool");
     }
 
@@ -961,21 +976,48 @@ void Renderer::RecordCommandBuffers() {
 
     // Start command buffer recording
     for (size_t i = 0; i < commandBuffers.size(); i++) {
-        VkCommandBufferBeginInfo beginInfo = {};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-        beginInfo.pInheritanceInfo = nullptr;
+        
+    }
+}
 
-        // ~ Start recording ~
-        if (vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to begin recording command buffer");
-        }
+void Renderer::RenderImGUI(ImDrawData* draw_data) {
+    if (!swapChain->Acquire()) {
+        RecreateFrameResources();
+        return;
+    }
+    VkResult err;
+    {
+        std::cout << "Wait for fence" << std::endl;
+        err = vkWaitForFences(logicalDevice, 1, &Fence, VK_TRUE, UINT64_MAX);    // wait indefinitely instead of periodically checking
+        err = vkResetFences(logicalDevice, 1, &Fence);
+    }
+    {
+        err = vkResetCommandPool(logicalDevice, imguiCommandPool, 0);
+        VkCommandBufferBeginInfo info = {};
+        info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        err = vkBeginCommandBuffer(imguiCommandBuffer, &info);
+    }
+    std::vector<VkBufferMemoryBarrier> barriers(scene->GetBlades().size());
+    for (uint32_t j = 0; j < barriers.size(); ++j) {
+        barriers[j].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barriers[j].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        barriers[j].dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+        barriers[j].srcQueueFamilyIndex = device->GetQueueIndex(QueueFlags::Compute);
+        barriers[j].dstQueueFamilyIndex = device->GetQueueIndex(QueueFlags::Graphics);
+        barriers[j].buffer = scene->GetBlades()[j]->GetNumBladesBuffer();
+        barriers[j].offset = 0;
+        barriers[j].size = sizeof(BladeDrawIndirect);
+    }
 
+    vkCmdPipelineBarrier(imguiCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 0, nullptr, barriers.size(), barriers.data(), 0, nullptr);
+
+    {
         // Begin the render pass
         VkRenderPassBeginInfo renderPassInfo = {};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = renderPass;
-        renderPassInfo.framebuffer = framebuffers[i];
+        renderPassInfo.framebuffer = framebuffers[(swapChain->GetIndex()) % swapChain->GetCount()];
         renderPassInfo.renderArea.offset = { 0, 0 };
         renderPassInfo.renderArea.extent = swapChain->GetVkExtent();
 
@@ -984,70 +1026,54 @@ void Renderer::RecordCommandBuffers() {
         clearValues[1].depthStencil = { 1.0f, 0 };
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         renderPassInfo.pClearValues = clearValues.data();
-
-        std::vector<VkBufferMemoryBarrier> barriers(scene->GetBlades().size());
-        for (uint32_t j = 0; j < barriers.size(); ++j) {
-            barriers[j].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-            barriers[j].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            barriers[j].dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-            barriers[j].srcQueueFamilyIndex = device->GetQueueIndex(QueueFlags::Compute);
-            barriers[j].dstQueueFamilyIndex = device->GetQueueIndex(QueueFlags::Graphics);
-            barriers[j].buffer = scene->GetBlades()[j]->GetNumBladesBuffer();
-            barriers[j].offset = 0;
-            barriers[j].size = sizeof(BladeDrawIndirect);
-        }
-
-        vkCmdPipelineBarrier(commandBuffers[i], VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 0, nullptr, barriers.size(), barriers.data(), 0, nullptr);
-
-        // Bind the camera descriptor set. This is set 0 in all pipelines so it will be inherited
-        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
-
-        vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-        // Bind the graphics pipeline
-        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-        for (uint32_t j = 0; j < scene->GetModels().size(); ++j) {
-            // Bind the vertex and index buffers
-            VkBuffer vertexBuffers[] = { scene->GetModels()[j]->getVertexBuffer() };
-            VkDeviceSize offsets[] = { 0 };
-            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-
-            vkCmdBindIndexBuffer(commandBuffers[i], scene->GetModels()[j]->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
-            // Bind the descriptor set for each model
-            vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelineLayout, 1, 1, &modelDescriptorSets[j], 0, nullptr);
-
-            // Draw
-            std::vector<uint32_t> indices = scene->GetModels()[j]->getIndices();
-            vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
-        }
-
-        // Bind the grass pipeline
-        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, grassPipeline);
-
-        for (uint32_t j = 0; j < scene->GetBlades().size(); ++j) {
-            VkBuffer vertexBuffers[] = { scene->GetBlades()[j]->GetBladesBuffer() };
-            VkDeviceSize offsets[] = { 0 };
-            // TODO: Uncomment this when the buffers are populated
-            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-
-            // TODO: Bind the descriptor set for each grass blades model
-            //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, grassPipelineLayout, 1, 1, &modelDescriptorSets[j], 0, nullptr);
-
-            // Draw
-            // TODO: Uncomment this when the buffers are populated
-            vkCmdDrawIndirect(commandBuffers[i], scene->GetBlades()[j]->GetNumBladesBuffer(), 0, 1, sizeof(BladeDrawIndirect));
-        }
-
-        // End render pass
-        vkCmdEndRenderPass(commandBuffers[i]);
-
-        // ~ End recording ~
-        if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to record command buffer");
-        }
+        vkCmdBeginRenderPass(imguiCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     }
+
+
+    // Bind the camera descriptor set. This is set 0 in all pipelines so it will be inherited
+    vkCmdBindDescriptorSets(imguiCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
+
+    // Bind the graphics pipeline
+    vkCmdBindPipeline(imguiCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+    for (uint32_t j = 0; j < scene->GetModels().size(); ++j) {
+        // Bind the vertex and index buffers
+        VkBuffer vertexBuffers[] = { scene->GetModels()[j]->getVertexBuffer() };
+        VkDeviceSize offsets[] = { 0 };
+        vkCmdBindVertexBuffers(imguiCommandBuffer, 0, 1, vertexBuffers, offsets);
+
+        vkCmdBindIndexBuffer(imguiCommandBuffer, scene->GetModels()[j]->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+        // Bind the descriptor set for each model
+        vkCmdBindDescriptorSets(imguiCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelineLayout, 1, 1, &modelDescriptorSets[j], 0, nullptr);
+
+        // Draw
+        std::vector<uint32_t> indices = scene->GetModels()[j]->getIndices();
+        vkCmdDrawIndexed(imguiCommandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+    }
+
+    // Bind the grass pipeline
+    vkCmdBindPipeline(imguiCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, grassPipeline);
+
+    for (uint32_t j = 0; j < scene->GetBlades().size(); ++j) {
+        VkBuffer vertexBuffers[] = { scene->GetBlades()[j]->GetBladesBuffer() };
+        VkDeviceSize offsets[] = { 0 };
+        // TODO: Uncomment this when the buffers are populated
+        vkCmdBindVertexBuffers(imguiCommandBuffer, 0, 1, vertexBuffers, offsets);
+
+        // TODO: Bind the descriptor set for each grass blades model
+        //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, grassPipelineLayout, 1, 1, &modelDescriptorSets[j], 0, nullptr);
+
+        // Draw
+        // TODO: Uncomment this when the buffers are populated
+        vkCmdDrawIndirect(imguiCommandBuffer, scene->GetBlades()[j]->GetNumBladesBuffer(), 0, 1, sizeof(BladeDrawIndirect));
+    }
+    // Record dear imgui primitives into command buffer
+    ImGui_ImplVulkan_RenderDrawData(draw_data, imguiCommandBuffer);
+
+    // End render pass
+    vkCmdEndRenderPass(imguiCommandBuffer);
+    err = vkEndCommandBuffer(imguiCommandBuffer);
 }
 
 void Renderer::Frame() {
@@ -1062,11 +1088,6 @@ void Renderer::Frame() {
         throw std::runtime_error("Failed to submit draw command buffer");
     }
 
-    if (!swapChain->Acquire()) {
-        RecreateFrameResources();
-        return;
-    }
-
     // Submit the command buffer
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1078,13 +1099,14 @@ void Renderer::Frame() {
     submitInfo.pWaitDstStageMask = waitStages;
 
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers[swapChain->GetIndex()];
+    std::array<VkCommandBuffer, 1> cmdBuffers = { imguiCommandBuffer };
+    submitInfo.pCommandBuffers = cmdBuffers.data();
 
     VkSemaphore signalSemaphores[] = { swapChain->GetRenderFinishedVkSemaphore() };
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    if (vkQueueSubmit(device->GetQueue(QueueFlags::Graphics), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+    if (vkQueueSubmit(device->GetQueue(QueueFlags::Graphics), 1, &submitInfo, Fence) != VK_SUCCESS) {
         throw std::runtime_error("Failed to submit draw command buffer");
     }
 
@@ -1120,4 +1142,30 @@ Renderer::~Renderer() {
     DestroyFrameResources();
     vkDestroyCommandPool(logicalDevice, computeCommandPool, nullptr);
     vkDestroyCommandPool(logicalDevice, graphicsCommandPool, nullptr);
+}
+
+void Renderer::CreateImguiResources() {
+    // Specify the command pool and number of buffers to allocate
+    VkCommandBufferAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = imguiCommandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+
+    if (vkAllocateCommandBuffers(logicalDevice, &allocInfo, &imguiCommandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate imgui command buffers");
+    }
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.pNext = nullptr;
+    // Optionally create the fence in a signaled state
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    if (vkCreateFence(logicalDevice, &fenceInfo, nullptr, &Fence) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create Vulkan fence!");
+    }
+}
+
+void Renderer::RecordImguiCommandBuffer() {
+
 }
