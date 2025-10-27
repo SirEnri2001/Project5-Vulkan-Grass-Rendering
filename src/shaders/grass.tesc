@@ -9,6 +9,16 @@ layout(set = 0, binding = 0) uniform CameraBufferObject {
 } camera;
 
 // TODO: Declare tessellation control shader inputs and outputs
+layout(location = 0) in vec4 inPosition_Direction[];
+layout(location = 1) in vec4 inBezier_Height[];
+layout(location = 2) in vec4 inModelGuide_Width[];
+layout(location = 3) in vec4 inUpVec_Stiffness[];
+
+
+layout(location = 0) out vec4 outPosition_Direction[];
+layout(location = 1) out vec4 outBezier_Height[];
+layout(location = 2) out vec4 outModelGuide_Width[];
+layout(location = 3) out vec4 outUpVec_Stiffness[];
 
 void main() {
 	// Don't move the origin location of the patch
@@ -17,10 +27,15 @@ void main() {
 	// TODO: Write any shader outputs
 
 	// TODO: Set level of tesselation
-    // gl_TessLevelInner[0] = ???
-    // gl_TessLevelInner[1] = ???
-    // gl_TessLevelOuter[0] = ???
-    // gl_TessLevelOuter[1] = ???
-    // gl_TessLevelOuter[2] = ???
-    // gl_TessLevelOuter[3] = ???
+	gl_TessLevelInner[0] = 6.0;
+	gl_TessLevelInner[1] = 6.0;
+	gl_TessLevelOuter[0] = 6.0;
+	gl_TessLevelOuter[1] = 6.0;
+	gl_TessLevelOuter[2] = 6.0;
+	gl_TessLevelOuter[3] = 6.0;
+	
+    outPosition_Direction[gl_InvocationID] = inPosition_Direction[gl_InvocationID];
+    outBezier_Height[gl_InvocationID] = inBezier_Height[gl_InvocationID];
+    outModelGuide_Width[gl_InvocationID] = inModelGuide_Width[gl_InvocationID];
+    outUpVec_Stiffness[gl_InvocationID] = inUpVec_Stiffness[gl_InvocationID];
 }

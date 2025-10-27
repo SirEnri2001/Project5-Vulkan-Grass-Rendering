@@ -37,6 +37,9 @@ namespace {
         void *userData) {
 
         fprintf(stderr, "Validation layer: %s\n", msg);
+#ifndef NDEBUG
+        __debugbreak();
+#endif
         return VK_FALSE;
     }
 }

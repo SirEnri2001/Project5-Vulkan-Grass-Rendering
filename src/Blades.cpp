@@ -16,9 +16,9 @@ Blades::Blades(Device* device, VkCommandPool commandPool, float planeDim) : Mode
         glm::vec3 bladeUp(0.0f, 1.0f, 0.0f);
 
         // Generate positions and direction (v0)
-        float x = (generateRandomFloat() - 0.5f) * planeDim;
+        float x = (generateRandomFloat() - 0.5f)* planeDim;
         float y = 0.0f;
-        float z = (generateRandomFloat() - 0.5f) * planeDim;
+        float z = (generateRandomFloat() - 0.5f)* planeDim;
         float direction = generateRandomFloat() * 2.f * 3.14159265f;
         glm::vec3 bladePosition(x, y, z);
         currentBlade.v0 = glm::vec4(bladePosition, direction);
@@ -44,8 +44,8 @@ Blades::Blades(Device* device, VkCommandPool commandPool, float planeDim) : Mode
     indirectDraw.firstVertex = 0;
     indirectDraw.firstInstance = 0;
 
-    BufferUtils::CreateBufferFromData(device, commandPool, blades.data(), NUM_BLADES * sizeof(Blade), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, bladesBuffer, bladesBufferMemory);
-    BufferUtils::CreateBuffer(device, NUM_BLADES * sizeof(Blade), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, culledBladesBuffer, culledBladesBufferMemory);
+    BufferUtils::CreateBufferFromData(device, commandPool, blades.data(), NUM_BLADES * sizeof(Blade), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, bladesBuffer, bladesBufferMemory);
+    BufferUtils::CreateBuffer(device, NUM_BLADES * sizeof(Blade), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, culledBladesBuffer, culledBladesBufferMemory);
     BufferUtils::CreateBufferFromData(device, commandPool, &indirectDraw, sizeof(BladeDrawIndirect), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, numBladesBuffer, numBladesBufferMemory);
 }
 
