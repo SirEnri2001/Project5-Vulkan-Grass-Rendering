@@ -35,14 +35,9 @@ public:
     void CreateFrameResources();
     void DestroyFrameResources();
     void RecreateFrameResources();
-
-    void RecordCommandBuffers();
     void RecordComputeCommandBuffer();
 
-	void CreateImguiResources();
-    void RecordImguiCommandBuffer();
-
-    void RenderImGUI(ImDrawData* draw_data);
+    void RenderWithImGUI(ImDrawData* draw_data);
 
     void Frame();
     VkRenderPass renderPass;
@@ -55,7 +50,6 @@ private:
     Camera* camera;
 
     VkCommandPool graphicsCommandPool;
-    VkCommandPool imguiCommandPool;
     VkCommandPool computeCommandPool;
 
     VkFence Fence;
@@ -88,9 +82,6 @@ private:
     VkDeviceMemory depthImageMemory;
     VkImageView depthImageView;
     std::vector<VkFramebuffer> framebuffers;
-
-    std::vector<VkCommandBuffer> commandBuffers;
     VkCommandBuffer graphicsCommandBuffer;
     VkCommandBuffer computeCommandBuffer;
-    VkCommandBuffer imguiCommandBuffer;
 };

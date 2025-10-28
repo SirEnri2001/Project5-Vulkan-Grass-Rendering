@@ -89,7 +89,7 @@ namespace {
 
 int main() {
     static constexpr char* applicationName = "Vulkan Grass Rendering";
-    InitializeWindow(640, 480, applicationName);
+    InitializeWindow(1280, 960, applicationName);
 
     unsigned int glfwExtensionCount = 0;
     const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -256,7 +256,7 @@ int main() {
         // Rendering
         ImGui::Render();
         ImDrawData* draw_data = ImGui::GetDrawData();
-		renderer->RenderImGUI(draw_data);
+		renderer->RenderWithImGUI(draw_data);
         scene->UpdateTime();
         
         renderer->Frame();
