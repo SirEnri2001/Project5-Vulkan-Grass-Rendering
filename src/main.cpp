@@ -204,7 +204,7 @@ int main() {
     glfwSetWindowSizeCallback(GetGLFWWindow(), resizeCallback);
     glfwSetMouseButtonCallback(GetGLFWWindow(), mouseDownCallback);
     glfwSetCursorPosCallback(GetGLFWWindow(), mouseMoveCallback);
-    Params params;
+    Params params, params1;
     while (!ShouldQuit()) {
         glfwPollEvents();
 
@@ -221,7 +221,12 @@ int main() {
             ImGui::SliderFloat("Culling Scale", &params.cullingScale, 0.0f, 10.0f);
             ImGui::SliderFloat("Culling Distance", &params.cullingDistance, 0.0f, 200.0f);
 			ImGui::DragFloat4("Wind Direction", &params.windDirection.x, 0.1f, -1.0f, 1.0f);
-			ImGui::DragFloat4("LOD Distances", &params.lod.x, 1.0f, 0.0f, 100.0f);
+			ImGui::DragFloat4("LOD Distances", &params.lod.x, 1.0f, -1.f, 100.0f);
+            ImGui::DragFloat4("Switches", &params.switches.x, 1.0f, -1.0f, 1.0f);
+            if(ImGui::Button("Reset Params"))
+            {
+                params = params1;
+			}
             ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
         }

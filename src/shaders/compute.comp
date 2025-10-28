@@ -49,6 +49,7 @@ layout(std140,set = 2, binding = 2) buffer NumBlades {
 layout(set = 2, binding = 3) uniform Params {
 	vec4 windDirection;
 	vec4 lod;
+	vec4 switches; // distance, frustum, direction, LOD
 	float windNoiseScale;
 	float windStrength;
 	float gravityStrength;
@@ -176,23 +177,32 @@ void main() {
 	// Note: to do this, you will need to use an atomic operation to read and update numBlades.vertexCount
 	// You want to write the visible blades to the buffer without write conflicts between threads
 	// Direction Culling
-	vec3 grassViewDir = normalize(blade.v0.xyz - camera.viewPos.xyz);
-	if(abs(dot(t1, grassViewDir))>0.98){
-		return;
-	}
-	// Frustum Culling (Approximate with bounding sphere)
-	vec4 p0 = camera.proj * camera.view * vec4(v0, 1.);
-	//vec4 p2 = camera.proj * camera.view * vec4(v2, 1.);
-	//vec4 p1 = camera.proj * camera.view * vec4(0.25*v0+0.5*v1+0.25*v2, 1.);
-	float tolerance = params.cullingScale;
-	if(!inBounds(p0.x/p0.w,tolerance) || !inBounds(p0.y/p0.w,tolerance)){
-		return;
+	if(params.switches.z > 0.){
+		vec3 grassViewDir = normalize(blade.v0.xyz - camera.viewPos.xyz);
+		if(abs(dot(t1, grassViewDir))>0.98){
+			return;
+		}
 	}
 
-	float d_proj = length(camera.viewPos.xyz - v0);
-	if(d_proj > params.cullingDistance){
-		return;
+	// Frustum Culling (Approximate with bounding sphere)
+	if(params.switches.y > 0.){
+		vec4 p0 = camera.proj * camera.view * vec4(v0, 1.);
+		vec4 p2 = camera.proj * camera.view * vec4(v2, 1.);
+		vec4 p1 = camera.proj * camera.view * vec4(0.25*v0+0.5*v1+0.25*v2, 1.);
+		float tolerance = params.cullingScale;
+		if((!inBounds(p0.x/p0.w,tolerance) || !inBounds(p0.y/p0.w,tolerance)) 
+		&& (!inBounds(p1.x/p1.w,tolerance) || !inBounds(p1.y/p1.w,tolerance)) 
+		&&(!inBounds(p2.x/p2.w,tolerance) || !inBounds(p2.y/p2.w,tolerance)) ){
+			return;
+		}
 	}
+	if(params.switches.x > 0.){
+		float d_proj = length(camera.viewPos.xyz - v0);
+		if(d_proj > params.cullingDistance){
+			return;
+		}
+	}
+	
 	// Write the blade to the culled blades buffer
 	uint previousValue = atomicAdd(numBlades.vertexCount, 1);
 	culledBladesBuffer.culledBlades[previousValue] = blade;

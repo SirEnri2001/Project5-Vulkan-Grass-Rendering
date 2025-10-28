@@ -14,6 +14,7 @@ layout(set = 0, binding = 0) uniform CameraBufferObject {
 layout(set = 2, binding = 0) uniform Params {
 	vec4 windDirection;
 	vec4 lod;
+	vec4 switches; // distance, frustum, direction, LOD
 	float windNoiseScale;
 	float windStrength;
 	float gravityStrength;
@@ -46,15 +47,21 @@ void main() {
 	// TODO: Set level of tesselation
 	float d_proj = length(camera.viewPos.xyz - v0);
 	float tessLevel = 6.0;
-	if(d_proj > params.lod.x){
-		tessLevel = 4.0;
+	if(params.switches.w > 0.){
+		if(d_proj > params.lod.x){
+			tessLevel = 4.0;
+		}
+		if(d_proj > params.lod.y){
+			tessLevel = 3.0;
+		}
+		if(d_proj > params.lod.z){
+			tessLevel = 2.0;
+		}
+		if(d_proj > params.lod.w){
+			tessLevel = 1.0;
+		}
 	}
-	if(d_proj > params.lod.y){
-		tessLevel = 2.0;
-	}
-	if(d_proj > params.lod.z){
-		tessLevel = 1.0;
-	}
+	
 	gl_TessLevelInner[0] = tessLevel;
 	gl_TessLevelInner[1] = tessLevel;
 	gl_TessLevelOuter[0] = tessLevel;

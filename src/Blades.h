@@ -14,12 +14,13 @@ constexpr static float MAX_BEND = 13.0f;
 
 struct Params {
     glm::vec4 windDirection = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-    glm::vec4 lod = glm::vec4(10.0f, 20.0f, 30.0f, 40.0f);
+    glm::vec4 lod = glm::vec4(15.0f, 20.0f, 25.0f, 30.0f);
+    glm::vec4 switches = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
     float windNoiseScale = 0.5f;
     float windStrength = 1.0f;
     float gravityStrength = 3.f;
-    float cullingScale = 1.0f;
-    float cullingDistance = 200.0f;
+    float cullingScale = 1.2f;
+    float cullingDistance = 40.0f;
 };
 
 struct Blade {
