@@ -6,7 +6,20 @@ layout(vertices = 1) out;
 layout(set = 0, binding = 0) uniform CameraBufferObject {
     mat4 view;
     mat4 proj;
+	vec4 viewDir;
+	vec4 viewPos;
 } camera;
+
+
+layout(set = 2, binding = 0) uniform Params {
+	vec4 windDirection;
+	vec4 lod;
+	float windNoiseScale;
+	float windStrength;
+	float gravityStrength;
+	float cullingScale;
+	float cullingDistance;
+} params;
 
 // TODO: Declare tessellation control shader inputs and outputs
 layout(location = 0) in vec4 inPosition_Direction[];
@@ -25,17 +38,28 @@ void main() {
     gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
 
 	// TODO: Write any shader outputs
-
-	// TODO: Set level of tesselation
-	gl_TessLevelInner[0] = 6.0;
-	gl_TessLevelInner[1] = 6.0;
-	gl_TessLevelOuter[0] = 6.0;
-	gl_TessLevelOuter[1] = 6.0;
-	gl_TessLevelOuter[2] = 6.0;
-	gl_TessLevelOuter[3] = 6.0;
-	
     outPosition_Direction[gl_InvocationID] = inPosition_Direction[gl_InvocationID];
     outBezier_Height[gl_InvocationID] = inBezier_Height[gl_InvocationID];
     outModelGuide_Width[gl_InvocationID] = inModelGuide_Width[gl_InvocationID];
     outUpVec_Stiffness[gl_InvocationID] = inUpVec_Stiffness[gl_InvocationID];
+	vec3 v0 = inPosition_Direction[0].xyz;
+	// TODO: Set level of tesselation
+	float d_proj = length(camera.viewPos.xyz - v0);
+	float tessLevel = 6.0;
+	if(d_proj > params.lod.x){
+		tessLevel = 4.0;
+	}
+	if(d_proj > params.lod.y){
+		tessLevel = 2.0;
+	}
+	if(d_proj > params.lod.z){
+		tessLevel = 1.0;
+	}
+	gl_TessLevelInner[0] = tessLevel;
+	gl_TessLevelInner[1] = tessLevel;
+	gl_TessLevelOuter[0] = tessLevel;
+	gl_TessLevelOuter[1] = tessLevel;
+	gl_TessLevelOuter[2] = tessLevel;
+	gl_TessLevelOuter[3] = tessLevel;
+	
 }

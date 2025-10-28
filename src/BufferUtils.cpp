@@ -1,5 +1,6 @@
 #include "BufferUtils.h"
 #include "Instance.h"
+#include "Utilities.inl"
 
 void BufferUtils::CreateBuffer(Device* device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
     // Create buffer
@@ -40,7 +41,6 @@ void BufferUtils::CopyBuffer(Device* device, VkCommandPool commandPool, VkBuffer
 
     VkCommandBuffer commandBuffer;
     vkAllocateCommandBuffers(device->GetVkDevice(), &allocInfo, &commandBuffer);
-
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;

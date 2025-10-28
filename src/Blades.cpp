@@ -7,6 +7,7 @@ float generateRandomFloat() {
 }
 
 Blades::Blades(Device* device, VkCommandPool commandPool, float planeDim) : Model(device, commandPool, {}, {}) {
+    transferCommandPool = commandPool;
     std::vector<Blade> blades;
     blades.reserve(NUM_BLADES);
 
@@ -39,14 +40,51 @@ Blades::Blades(Device* device, VkCommandPool commandPool, float planeDim) : Mode
     }
 
     BladeDrawIndirect indirectDraw;
-    indirectDraw.vertexCount = NUM_BLADES;
+    indirectDraw.vertexCount = 0;
     indirectDraw.instanceCount = 1;
     indirectDraw.firstVertex = 0;
     indirectDraw.firstInstance = 0;
 
     BufferUtils::CreateBufferFromData(device, commandPool, blades.data(), NUM_BLADES * sizeof(Blade), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, bladesBuffer, bladesBufferMemory);
     BufferUtils::CreateBuffer(device, NUM_BLADES * sizeof(Blade), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, culledBladesBuffer, culledBladesBufferMemory);
-    BufferUtils::CreateBufferFromData(device, commandPool, &indirectDraw, sizeof(BladeDrawIndirect), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, numBladesBuffer, numBladesBufferMemory);
+    
+    
+    {
+        VkDeviceSize bufferSize = sizeof(Params);
+        VkBufferUsageFlags bufferUsage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        VkBufferUsageFlags stagingUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        VkMemoryPropertyFlags stagingProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        BufferUtils::CreateBuffer(device, bufferSize, stagingUsage, stagingProperties, paramStagingBuffer, paramStagingBufferMemory);
+        // Create the buffer
+        VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | bufferUsage;
+        VkMemoryPropertyFlags flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        BufferUtils::CreateBuffer(device, bufferSize, usage, flags, paramUniformBuffer, paramUniformBufferMemory);
+    }
+    
+    {
+		VkDeviceSize bufferSize = sizeof(BladeDrawIndirect);
+		void* bufferData = &indirectDraw;
+		VkBufferUsageFlags bufferUsage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+
+
+        VkBufferUsageFlags stagingUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        VkMemoryPropertyFlags stagingProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        BufferUtils::CreateBuffer(device, bufferSize, stagingUsage, stagingProperties, stagingBuffer, stagingBufferMemory);
+
+        // Fill the staging buffer
+        void* data;
+        vkMapMemory(device->GetVkDevice(), stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, bufferData, static_cast<size_t>(bufferSize));
+        vkUnmapMemory(device->GetVkDevice(), stagingBufferMemory);
+
+        // Create the buffer
+        VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | bufferUsage;
+        VkMemoryPropertyFlags flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        BufferUtils::CreateBuffer(device, bufferSize, usage, flags, numBladesBuffer, numBladesBufferMemory);
+
+        // Copy data from staging to buffer
+        BufferUtils::CopyBuffer(device, commandPool, stagingBuffer, numBladesBuffer, bufferSize);
+    }
 }
 
 VkBuffer Blades::GetBladesBuffer() const {
@@ -61,6 +99,27 @@ VkBuffer Blades::GetNumBladesBuffer() const {
     return numBladesBuffer;
 }
 
+VkBuffer Blades::GetParamBuffer() const {
+    return paramUniformBuffer;
+}
+
+void Blades::ResetNumBladesBuffer() {
+    // Copy data from staging to buffer
+    VkDeviceSize bufferSize = sizeof(BladeDrawIndirect);
+    BufferUtils::CopyBuffer(device, transferCommandPool, stagingBuffer, numBladesBuffer, bufferSize);
+}
+
+void Blades::CopyParams(void* inParamData) {
+    // Fill the staging buffer
+    VkDeviceSize bufferSize = sizeof(Params);
+    void* data;
+    vkMapMemory(device->GetVkDevice(), paramStagingBufferMemory, 0, bufferSize, 0, &data);
+	memcpy(data, inParamData, static_cast<size_t>(bufferSize));
+    vkUnmapMemory(device->GetVkDevice(), paramStagingBufferMemory);
+    // Copy data from staging to buffer
+    BufferUtils::CopyBuffer(device, transferCommandPool, paramStagingBuffer, paramUniformBuffer, bufferSize);
+}
+
 Blades::~Blades() {
     vkDestroyBuffer(device->GetVkDevice(), bladesBuffer, nullptr);
     vkFreeMemory(device->GetVkDevice(), bladesBufferMemory, nullptr);
@@ -68,4 +127,8 @@ Blades::~Blades() {
     vkFreeMemory(device->GetVkDevice(), culledBladesBufferMemory, nullptr);
     vkDestroyBuffer(device->GetVkDevice(), numBladesBuffer, nullptr);
     vkFreeMemory(device->GetVkDevice(), numBladesBufferMemory, nullptr);
+
+    // No need for the staging buffer anymore
+    vkDestroyBuffer(device->GetVkDevice(), stagingBuffer, nullptr);
+    vkFreeMemory(device->GetVkDevice(), stagingBufferMemory, nullptr);
 }

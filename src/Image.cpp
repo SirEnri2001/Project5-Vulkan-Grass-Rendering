@@ -5,6 +5,7 @@
 #include "Device.h"
 #include "Instance.h"
 #include "BufferUtils.h"
+#include "Utilities.inl"
 
 void Image::Create(Device* device, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
     // Create Vulkan image

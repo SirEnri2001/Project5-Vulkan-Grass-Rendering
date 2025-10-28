@@ -5,6 +5,8 @@
 #include "Scene.h"
 #include "Camera.h"
 struct ImDrawData;
+
+
 class Renderer {
 public:
     Renderer() = delete;
@@ -58,6 +60,7 @@ private:
     VkDescriptorSetLayout modelDescriptorSetLayout;
     VkDescriptorSetLayout grassDescriptorSetLayout;
     VkDescriptorSetLayout timeDescriptorSetLayout;
+	VkDescriptorSetLayout paramsDescriptorSetLayout;
     
     VkDescriptorPool descriptorPool;
 
@@ -65,6 +68,7 @@ private:
     std::vector<VkDescriptorSet> modelDescriptorSets;
     std::vector<VkDescriptorSet> grassDescriptorSets;
     VkDescriptorSet timeDescriptorSet;
+	VkDescriptorSet paramsDescriptorSet;
 
 	VkDescriptorSetLayout computeDescriptorSetLayout;
 	VkDescriptorSet computeDescriptorSet;

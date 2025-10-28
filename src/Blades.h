@@ -12,6 +12,16 @@ constexpr static float MAX_WIDTH = 0.14f;
 constexpr static float MIN_BEND = 7.0f;
 constexpr static float MAX_BEND = 13.0f;
 
+struct Params {
+    glm::vec4 windDirection = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+    glm::vec4 lod = glm::vec4(10.0f, 20.0f, 30.0f, 40.0f);
+    float windNoiseScale = 0.5f;
+    float windStrength = 1.0f;
+    float gravityStrength = 3.f;
+    float cullingScale = 1.0f;
+    float cullingDistance = 200.0f;
+};
+
 struct Blade {
     // Position and direction
     glm::vec4 v0;
@@ -74,15 +84,26 @@ private:
     VkBuffer bladesBuffer;
     VkBuffer culledBladesBuffer;
     VkBuffer numBladesBuffer;
+    VkBuffer paramUniformBuffer;
 
     VkDeviceMemory bladesBufferMemory;
     VkDeviceMemory culledBladesBufferMemory;
     VkDeviceMemory numBladesBufferMemory;
+	VkDeviceMemory paramUniformBufferMemory;
 
+    // Create the staging buffer
+    VkBuffer stagingBuffer;
+    VkBuffer paramStagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+	VkDeviceMemory paramStagingBufferMemory;
+    VkCommandPool transferCommandPool;
 public:
     Blades(Device* device, VkCommandPool commandPool, float planeDim);
     VkBuffer GetBladesBuffer() const;
     VkBuffer GetCulledBladesBuffer() const;
     VkBuffer GetNumBladesBuffer() const;
+    VkBuffer GetParamBuffer() const;
+	void ResetNumBladesBuffer();
+    void CopyParams(void* data);
     ~Blades();
 };

@@ -18,6 +18,9 @@ layout(location = 3) in vec4 inUpVec_Stiffness[];
 layout(location = 0) out vec4 outWorldPos;
 layout(location = 1) out vec4 outNormal;
 layout(location = 2) out vec4 outUV;
+layout(location = 3) out vec4 outAlpha;
+layout(location = 4) out vec4 outTangent;
+layout(location = 5) out vec4 outCotangent;
 
 void main() {
     float u = gl_TessCoord.x;
@@ -37,9 +40,11 @@ void main() {
     vec3 b = mix(v1, v2, v);
     vec3 c = mix(a, b, v);
     vec3 t1 = vec3(sin(directionRad), 0., cos(directionRad));
+    outCotangent = vec4(t1, 0.);
     vec3 c0 = c - width * t1 * 0.5;
     vec3 c1 = c + width * t1 * 0.5;
     vec3 t0 = normalize(b - a);
+    outTangent = vec4(t0, 0.);
     vec3 normal = normalize(cross(t0, t1));
     float t = u + 0.5*v - u * v;
     outWorldPos = vec4(mix(c0, c1, t), 1.);
@@ -47,6 +52,12 @@ void main() {
 
 	// TODO: Use u and v to parameterize along the grass blade and output positions for each vertex of the grass blade
     outUV = vec4(u, v, 0., 1.);
-    outNormal = vec4(normal, 1.);
+    outNormal = vec4(normal, 0.);
 	gl_Position = camera.proj * camera.view * outWorldPos;
+    /*
+	vec3 grassViewDir = normalize(blade.v0.xyz - camera.viewPos.xyz);
+	if(abs(dot(t1, grassViewDir))>0.98){
+		return;
+	}*/
+    outAlpha.x = 0.5;
 }
