@@ -30,5 +30,6 @@ void main() {
 
     vec3 grassColor = vec3(0.2, 0.8, 0.2);
     float lightIntensity = abs(dot(normalize(normal), lightDir))*0.5+0.5;
+    lightIntensity *= inUV.y*0.7+0.3; // Darken the color towards the top
     outColor = vec4(lightIntensity * grassColor, 1.);
 }
